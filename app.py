@@ -39,11 +39,11 @@ if uploaded_file:
             results = vit_engine.predict(image)
             
             # 터미널 로그 출력 (VS Code 터미널에서 확인 가능)
-            print(f"DEBUG - ViT Inference Result: {results}")
+            print(f"ViT Inference Result: {results}")
             st.success("✅ 1단계: 이미지 특성 추출 완료")
 
-            # 3. GPT 리포트 생성 (API 연산)
-            status_text.info("✍️ 2단계: GPT 모델이 분석 리포트를 작성 중입니다...")
+            # 3. GPT 리포트 생성 (API 호출)
+            status_text.info("✍️ 2단계: LLM 모델이 분석 리포트를 작성 중입니다...")
             
             try:
                 # llm_engine이 이제 GPTLLMService 인스턴스여야 함

@@ -17,19 +17,7 @@ class ViTInference:
         
         if os.path.exists(st_path):
             state_dict = load_file(st_path, device=self.device)
-            
-            # --- [수정 시작] 이름표 갈아끼우기 (backbone -> vit) ---
-            new_state_dict = {}
-            for key, value in state_dict.items():
-                # 'backbone.'으로 시작하는 키를 'vit.'으로 변경
-                new_key = key.replace("backbone.", "vit.")
-                new_state_dict[new_key] = value
-            # ---------------------------------------------------
-            
-            # 바뀐 이름표를 가진 가중치로 로드
-            model.load_state_dict(new_state_dict)
-            print("✅ 가중치 이름 변환 및 로드 완료 (backbone -> vit)")
-            
+            model.load_state_dict(state_dict)
         else:
             raise FileNotFoundError(f"모델 파일을 찾을 수 없습니다: {st_path}")
 
@@ -39,6 +27,7 @@ class ViTInference:
 
     def predict(self, image):
         inputs = self.processor(image, return_tensors="pt").to(self.device)
+        
         with torch.no_grad():
             outputs = self.model(inputs['pixel_values'])
         

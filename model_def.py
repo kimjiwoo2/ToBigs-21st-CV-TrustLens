@@ -1,12 +1,11 @@
-import torch
 import torch.nn as nn
-from transformers import ViTModel, ViTConfig
+from transformers import ViTModel
 
 class ViTMultiTask(nn.Module):
     def __init__(self, model_name_or_path, num_labels=4):
         super(ViTMultiTask, self).__init__()
-        self.vit = ViTModel.from_pretrained(model_name_or_path)
-        hidden_size = self.vit.config.hidden_size
+        self.backbone = ViTModel.from_pretrained(model_name_or_path)
+        hidden_size = self.backbone.config.hidden_size
 
         # Classification Head
         self.classifier = nn.Linear(hidden_size, num_labels)
@@ -16,7 +15,7 @@ class ViTMultiTask(nn.Module):
         self.regressor_strength = nn.Linear(hidden_size, 1)
 
     def forward(self, pixel_values, labels=None, ssim=None, lpips=None, strength=None):
-        outputs = self.vit(pixel_values=pixel_values)
+        outputs = self.backbone(pixel_values=pixel_values)
         sequence_output = outputs.last_hidden_state[:, 0, :]
 
         logits = self.classifier(sequence_output)
