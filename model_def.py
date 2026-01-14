@@ -14,8 +14,8 @@ class ViTMultiTask(nn.Module):
         self.regressor_lpips = nn.Linear(hidden_size, 1)
         self.regressor_strength = nn.Linear(hidden_size, 1)
 
-    def forward(self, pixel_values, labels=None, ssim=None, lpips=None, strength=None):
-        outputs = self.backbone(pixel_values=pixel_values)
+    def forward(self, pixel_values, labels=None, ssim=None, lpips=None, strength=None, output_attentions=False):
+        outputs = self.backbone(pixel_values=pixel_values, output_attentions=output_attentions)
         sequence_output = outputs.last_hidden_state[:, 0, :]
 
         logits = self.classifier(sequence_output)
@@ -27,5 +27,6 @@ class ViTMultiTask(nn.Module):
             "logits": logits,
             "pred_ssim": pred_ssim,
             "pred_lpips": pred_lpips,
-            "pred_strength": pred_strength
+            "pred_strength": pred_strength,
+            "attentions": outputs.attentions if output_attentions else None
         }
