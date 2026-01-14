@@ -5,3 +5,6 @@ pillow
 openai
 python-dotenv
 safetensors
+opencv-python
+matplotlib
+numpy
