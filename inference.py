@@ -36,6 +36,33 @@ class SwinInference:
         # Swin의 출력 형태: [Batch, Height, Width, Channels] -> [Batch, Channels, Height, Width]
         result = tensor.permute(0, 3, 1, 2)
         return result
+    
+    def _calc_rm_pvr(self, pil_image, k=3.0):
+        """
+        SRM 잔차 기반 RM/PVR 계산
+        - RM: mean(|residual|)
+        - PVR: |residual| > k*std(|residual|) 인 비율(%)
+        """
+        img_rgb = np.array(pil_image.convert("RGB"))
+        img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
+
+        # SRM 계열 간단 필터(너가 준 코드의 커널)
+        filter_kernel = np.array([
+            [0, -1,  2, -1, 0],
+            [0,  2, -4,  2, 0],
+            [0, -1,  2, -1, 0]
+        ], dtype=np.float32) / 4.0
+
+        res_map = cv2.filter2D(img_gray, -1, filter_kernel)
+        abs_res = np.abs(res_map)
+
+        rm = float(np.mean(abs_res))
+        std_res = float(np.std(abs_res))
+        threshold = k * std_res
+
+        pvr = float((np.sum(abs_res > threshold) / abs_res.size) * 100.0)
+        return rm, pvr, threshold
+
 
     def predict(self, pil_image): # img_path 대신 pil_image를 받음
         # 1. 전처리 (경로 로드 생략하고 바로 리사이즈)
@@ -67,10 +94,14 @@ class SwinInference:
         grayscale_cam = cam(input_tensor=input_tensor, targets=targets)[0, :]
         visualization = show_cam_on_image(rgb_img_float, grayscale_cam, use_rgb=True)
 
+        rm, pvr, pvr_th = self._calc_rm_pvr(pil_image, k=3.0)
+
         return {
             "label": pred_idx,
             "confidence": F.softmax(logits, dim=1)[0][pred_idx].item(),
             "ssim": outputs["pred_ssim"].item(),
             "lpips": outputs["pred_lpips"].item(),
+            "rm": rm,
+            "pvr": pvr,
             "heatmap": visualization
         }

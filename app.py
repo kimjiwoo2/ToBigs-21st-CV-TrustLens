@@ -3,6 +3,44 @@ from PIL import Image
 from inference import SwinInference
 from llm_service import SolarLLMService
 
+RISK_TABLE = {
+    0: {
+        "name": "Real (원본)",
+        "state": "Real",
+        "zone": "Zone A",
+        "traits": [
+            "원본 이미지"
+        ],
+    },
+    1: {
+        "name": "Sleek Fake (눈속임형)",
+        "state": "Low Risk",
+        "zone": "Zone B",
+        "traits": [
+            "SSIM Low / LPIPS Low (자연스러움)",
+            "RM 지표상 원본과 유사하나 PVR로 변별 가능"
+        ],
+    },
+    2: {
+        "name": "Noisy Fake (노이즈형)",
+        "state": "Mid Risk",
+        "zone": "Zone C",
+        "traits": [
+            "SSIM High / LPIPS High (어색함)",
+            "RM 및 PVR 수치 급증"
+        ],
+    },
+    3: {
+        "name": "Failure (망가짐)",
+        "state": "High Risk",
+        "zone": "Zone D",
+        "traits": [
+            "SSIM Low / LPIPS High (붕괴)",
+            "모든 물리적 지표 최악"
+        ],
+    },
+}
+
 # 1. 초기 설정 및 서비스 로드
 st.set_page_config(page_title="AI 생성 이미지 판별 시스템", layout="wide")
 
@@ -41,8 +79,10 @@ if uploaded_file:
         status_text = st.empty()
         try:
             status_text.info("🔍 모델 분석 및 리포트 작성 중...")
-            results = vit_engine.predict(image)
-            report = llm_engine.generate_report(results)
+
+            results = vit_engine.predict(image) # swin 추론 결과
+            report = llm_engine.generate_report(results) # LLM 리포트 결과
+
             st.session_state.results = (results, report) # 세션에 저장하여 리런 방지
             status_text.empty()
         except Exception as e:
@@ -54,12 +94,20 @@ if uploaded_file:
         
         # 1. 최상단: 핵심 지표 (Metric Cards)
         st.subheader("📊 종합 분석 대시보드")
-        m1, m2, m3 = st.columns(3)
-        risk_labels = ["안전", "주의", "경고", "위험"]
+        m1, m2, m3, m4, m5 = st.columns(5)
+        info = RISK_TABLE[results["label"]]
 
-        m1.metric("위험 등급", risk_labels[results['label']])
+        m1.metric("위험 등급", info["state"])
         m2.metric("SSIM (구조 유사도)", f"{results['ssim']:.4f}")
         m3.metric("LPIPS (지각 유사도)", f"{results['lpips']:.4f}")
+        m4.metric("RM", f"{results['rm']:.6f}")
+        m5.metric("PVR(%)", f"{results['pvr']:.2f}")    
+
+        st.markdown(f"**명칭**: {info['name']}")
+        st.markdown(f"**Zone**: {info['zone']}")
+        st.markdown("**물리적 특징**")
+        st.markdown("\n".join([f"- {t}" for t in info["traits"]]))
+
 
         st.divider()
 
@@ -69,7 +117,7 @@ if uploaded_file:
         with img_col1:
             st.image(image, caption="원본 이미지", use_container_width=True)
         with img_col2:
-            st.image(results['heatmap'], caption="Attention Heatmap (위변조 의심 영역)", use_container_width=True)
+            st.image(results['heatmap'], caption="위변조 의심 영역", use_container_width=True)
 
         st.divider()
 
