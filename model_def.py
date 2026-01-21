@@ -1,32 +1,28 @@
+import torch
 import torch.nn as nn
-from transformers import ViTModel
+import timm
 
-class ViTMultiTask(nn.Module):
-    def __init__(self, model_name_or_path, num_labels=4):
-        super(ViTMultiTask, self).__init__()
-        self.backbone = ViTModel.from_pretrained(model_name_or_path)
-        hidden_size = self.backbone.config.hidden_size
+class MultiTaskSwinV2(nn.Module):
+    def __init__(self, model_name='swinv2_small_window8_256', pretrained=False, num_classes=4):
+        super(MultiTaskSwinV2, self).__init__()
+        self.backbone = timm.create_model(model_name, pretrained=pretrained, num_classes=0)
+        num_features = self.backbone.num_features
 
-        # Classification Head
-        self.classifier = nn.Linear(hidden_size, num_labels)
-        # Regression Heads
-        self.regressor_ssim = nn.Linear(hidden_size, 1)
-        self.regressor_lpips = nn.Linear(hidden_size, 1)
-        self.regressor_strength = nn.Linear(hidden_size, 1)
+        self.head_label = nn.Sequential(
+            nn.Linear(num_features, 512), nn.ReLU(), nn.Dropout(0.3),
+            nn.Linear(512, num_classes)
+        )
+        self.head_ssim = nn.Sequential(
+            nn.Linear(num_features, 256), nn.ReLU(), nn.Linear(256, 1)
+        )
+        self.head_lpips = nn.Sequential(
+            nn.Linear(num_features, 256), nn.ReLU(), nn.Linear(256, 1)
+        )
 
-    def forward(self, pixel_values, labels=None, ssim=None, lpips=None, strength=None, output_attentions=False):
-        outputs = self.backbone(pixel_values=pixel_values, output_attentions=output_attentions)
-        sequence_output = outputs.last_hidden_state[:, 0, :]
-
-        logits = self.classifier(sequence_output)
-        pred_ssim = self.regressor_ssim(sequence_output)
-        pred_lpips = self.regressor_lpips(sequence_output)
-        pred_strength = self.regressor_strength(sequence_output)
-
+    def forward(self, x):
+        features = self.backbone(x)
         return {
-            "logits": logits,
-            "pred_ssim": pred_ssim,
-            "pred_lpips": pred_lpips,
-            "pred_strength": pred_strength,
-            "attentions": outputs.attentions if output_attentions else None
+            "logits": self.head_label(features),
+            "pred_ssim": self.head_ssim(features),
+            "pred_lpips": self.head_lpips(features),
         }

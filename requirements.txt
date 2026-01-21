@@ -8,3 +8,5 @@ safetensors
 opencv-python
 matplotlib
 numpy
+timm
+grad-cam

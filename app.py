@@ -1,17 +1,19 @@
 import streamlit as st
 from PIL import Image
-from inference import ViTInference
+from inference import SwinInference
 from llm_service import SolarLLMService
-from llm_service import GPTLLMService
 
 # 1. 초기 설정 및 서비스 로드
 st.set_page_config(page_title="AI 생성 이미지 판별 시스템", layout="wide")
 
 @st.cache_resource
 def init_services():
-    vit_engine = ViTInference(model_path="./models/best_model")
-    # llm_engine = SolarLLMService()
-    llm_engine = GPTLLMService()
+    # 모델 이름을 swinv2_small_window8_256으로 명시
+    vit_engine = SwinInference(
+        model_path="./models/sota/sota.pth", 
+        model_name='swinv2_small_window16_256'
+    )
+    llm_engine = SolarLLMService() # Solar로 변경
     return vit_engine, llm_engine
 
 vit_engine, llm_engine = init_services()
@@ -30,7 +32,7 @@ if uploaded_file:
         # 분석 전: 업로드된 이미지를 중앙에 작게 표시
         _, center_col, _ = st.columns([1, 2, 1])
         with center_col:
-            st.image(image, caption="분석 대기 중...", use_container_width=True)
+            st.image(image, caption="이미지 업로드 완료", use_container_width=True)
             btn = st.button("🚀 정밀 진단 시작", use_container_width=True)
     else:
         btn = False # 이미 결과가 있으면 버튼 비활성화 (필요 시)
@@ -52,14 +54,12 @@ if uploaded_file:
         
         # 1. 최상단: 핵심 지표 (Metric Cards)
         st.subheader("📊 종합 분석 대시보드")
-        m1, m2, m3, m4 = st.columns(4)
+        m1, m2, m3 = st.columns(3)
         risk_labels = ["안전", "주의", "경고", "위험"]
-        
-        # 등급에 따른 색상 강조 (단순 텍스트)
+
         m1.metric("위험 등급", risk_labels[results['label']])
         m2.metric("SSIM (구조 유사도)", f"{results['ssim']:.4f}")
         m3.metric("LPIPS (지각 유사도)", f"{results['lpips']:.4f}")
-        m4.metric("변형 강도", f"{results['strength']:.2f}")
 
         st.divider()
 
@@ -74,8 +74,7 @@ if uploaded_file:
         st.divider()
 
         # 3. 하단: 상세 전문가 리포트
-        st.subheader("📝 전문가 심층 분석 리포트")
-        st.info("LLM 모델이 생성한 포렌식 결과입니다.")
+        st.subheader("📝 심층 분석 리포트")
         st.markdown(report)
         
         # 다시하기 버튼

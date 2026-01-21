@@ -1,70 +1,76 @@
 import torch
-import os
-import cv2
+import torch.nn.functional as F
 import numpy as np
-from transformers import ViTImageProcessor
-from model_def import ViTMultiTask
-from safetensors.torch import load_file 
+import cv2
+from PIL import Image
+from torchvision import transforms
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from model_def import MultiTaskSwinV2
 
-class ViTInference:
-    def __init__(self, model_path, base_model="google/vit-base-patch16-224-in21k"):
+class SwinInference:
+    def __init__(self, model_path, model_name='swinv2_tiny_window16_256', img_size=256):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.processor = ViTImageProcessor.from_pretrained(base_model)
-        self.model = self._load_model(model_path, base_model)
+        self.img_size = img_size
+        
+        # 모델 로드
+        self.model = MultiTaskSwinV2(model_name=model_name)
+        checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+        
+        # state_dict 키 정리 (module. 제거 등)
+        state_dict = checkpoint['model_state_dict'] if 'model_state_dict' in checkpoint else checkpoint
+        new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+        self.model.load_state_dict(new_state_dict, strict=False)
+        self.model.to(self.device).eval()
 
-    def _load_model(self, model_path, base_model):
-        model = ViTMultiTask(base_model)
-        model.backbone.set_attn_implementation("eager")
-        st_path = os.path.join(model_path, "model.safetensors")
-        
-        if os.path.exists(st_path):
-            state_dict = load_file(st_path, device=self.device)
-            model.load_state_dict(state_dict)
-        else:
-            raise FileNotFoundError(f"모델 파일을 찾을 수 없습니다: {st_path}")
+        # 전처리 정의
+        self.transform = transforms.Compose([
+            transforms.Resize((self.img_size, self.img_size)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
 
-        model.to(self.device)
-        model.eval()
-        return model
-    
-    def _generate_heatmap(self, image, attentions):
-        # 1. 마지막 레이어 어텐션 추출 (batch, heads, seq, seq)
-        # 모든 헤드의 평균을 구하고 CLS 토큰(0번)의 가중치만 추출
-        last_layer_attn = attentions[-1] 
-        avg_attn = torch.mean(last_layer_attn, dim=1)[0, 0, 1:] # (196,)
-        
-        # 2. 14x14 그리드로 변환 및 정규화
-        grid_size = int(np.sqrt(avg_attn.size(0)))
-        heatmap = avg_attn.reshape(grid_size, grid_size).cpu().numpy()
-        heatmap = (heatmap - heatmap.min()) / (heatmap.max() - heatmap.min())
-        
-        # 3. 이미지 크기에 맞게 확대 (224x224)
-        heatmap = cv2.resize(heatmap, (224, 224))
-        heatmap = np.uint8(255 * heatmap)
-        
-        # 4. 컬러맵 적용 및 원본 이미지와 합성
-        heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-        img_np = np.array(image.resize((224, 224)))
-        # OpenCV 컬러는 BGR이므로 RGB 변환 후 합성
-        heatmap_color = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
-        superimposed_img = cv2.addWeighted(img_np, 0.6, heatmap_color, 0.4, 0)
-        
-        return superimposed_img
+    def reshape_transform(self, tensor):
+        """Swin Transformer의 출력을 CAM용 2D 형태로 변환"""
+        # Swin의 출력 형태: [Batch, Height, Width, Channels] -> [Batch, Channels, Height, Width]
+        result = tensor.permute(0, 3, 1, 2)
+        return result
 
-    def predict(self, image):
-        image_rgb = image.convert("RGB")
-        inputs = self.processor(image_rgb, return_tensors="pt").to(self.device)
-        
-        with torch.no_grad():
-            outputs = self.model(inputs['pixel_values'], output_attentions=True)
+    def predict(self, pil_image): # img_path 대신 pil_image를 받음
+        # 1. 전처리 (경로 로드 생략하고 바로 리사이즈)
+        image_rgb = pil_image.convert('RGB')
+        raw_image_resized = image_rgb.resize((self.img_size, self.img_size))
+        rgb_img_float = np.array(raw_image_resized, dtype=np.float32) / 255.0
+        input_tensor = self.transform(image_rgb).unsqueeze(0).to(self.device)
 
-        # 히트맵 생성
-        heatmap_res = self._generate_heatmap(image_rgb, outputs['attentions'])
+        # 2. Grad-CAM 설정 (중략)
+        target_layers = [self.model.backbone.layers[-1].blocks[-1].norm1]
         
+        class CAMWrapper(torch.nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                self.model = model
+            def forward(self, x):
+                return self.model(x)["logits"]
+
+        cam = GradCAM(model=CAMWrapper(self.model), 
+                      target_layers=target_layers, 
+                      reshape_transform=self.reshape_transform)
+
+        # 3. 추론
+        outputs = self.model(input_tensor)
+        logits = outputs["logits"]
+        pred_idx = torch.argmax(logits, dim=1).item()
+        
+        targets = [ClassifierOutputTarget(pred_idx)]
+        grayscale_cam = cam(input_tensor=input_tensor, targets=targets)[0, :]
+        visualization = show_cam_on_image(rgb_img_float, grayscale_cam, use_rgb=True)
+
         return {
-            "label": torch.argmax(outputs['logits'], dim=1).item(),
-            "ssim": outputs['pred_ssim'].item(),
-            "lpips": outputs['pred_lpips'].item(),
-            "strength": outputs['pred_strength'].item(),
-            "heatmap": heatmap_res
+            "label": pred_idx,
+            "confidence": F.softmax(logits, dim=1)[0][pred_idx].item(),
+            "ssim": outputs["pred_ssim"].item(),
+            "lpips": outputs["pred_lpips"].item(),
+            "heatmap": visualization
         }

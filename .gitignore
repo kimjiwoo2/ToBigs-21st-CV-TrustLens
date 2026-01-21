@@ -2,7 +2,7 @@
 ./venv/
 
 # models/best_model 폴더 안의 모든 파일을 무시하되,
-models/best_model/*
+models/*
 
 # 폴더 자체를 깃이 추적할 수 있게 .gitkeep 파일만 예외로 둠
 !models/best_model/.gitkeep
