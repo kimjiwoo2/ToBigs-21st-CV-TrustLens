@@ -5,21 +5,23 @@ TrustLens는 이커머스 환경에서 생성형 AI로 만든 이미지를 탐�
 기존의 생성 확률 제시를 넘어, 정량적 지표로 위험도를 진단하고 사용자에게 명확한 판단 근거를 제시하는 신뢰 프레임워크를 제안합니다. 
 
 
-## 워크플로우 
 
-1. **데이터셋 구축**
+## WorkFlow 
+
+1. **데이터셋 구축:**
     원본 이미지와 생성 모델 Stable Diffusion을 활용한 생성 이미지 데이터셋 구축.
-2. **데이터 레이블링**
+2. **데이터 레이블링:**
     정량적 지표에 따른 K-Means Clustering으로 위험 단계 레이블링(Zone A~D) 및 유효성 검증.
-3. **모델 학습** 
+3. **모델 학습:** 
     직접 생성한 데이터셋을 이용하여 Pre-trained ViT 계열의 Swin Transformer 모델 Fine-Tuning.
-4. **결과 해석 및 시각화** 
+4. **결과 해석 및 시각화:** 
     위험 단계 분류에 대한 해석 및 시각적 근거 도출.
-5. **데모 서비스 구현**
+5. **데모 서비스 구현:**
     도출된 근거를 바탕으로 LLM을 통한 리스크 리포트 생성 및 Streamlit UI 구현.
 
 
-## 핵심 기능 및 내용 
+
+## Key Contents
 
 1. **Stable Diffusion을 활용한 AI 이미지 생성:**
     - Prompt 및 모델 파라미터 실험을 통해 이미지 생성.
@@ -38,16 +40,19 @@ TrustLens는 이커머스 환경에서 생성형 AI로 만든 이미지를 탐�
     - 분석된 지표를 바탕으로 프롬프트 엔지니어링 기반 LLM을 통해 리스크 리포트 생성. 
 
 
-## 기술 스택
+
+## Tech Stack
 - **Language**: Python
 - **Generative AI**: Stable Diffusion (Hugging Face)
 - **Deep Learning**: PyTorch, Swin Transformer (Hugging Face), Grad-CAM
 - **Data Analysis**: Pandas, Scikit-learn, Matplotlib, Statsmodels (ANOVA/Tukey HSD)
-- **Service**: Streamlit, Solar Pro 2 API
+- **Service**: Streamlit, Solar Pro2 API
 - **Tools**: Google Colab, Google Drive (Data Management), Notion, Git
 
 
-## 디렉토리 구조 
+
+## Directory
+```
 TrustLens
 ├── DATASET            # REAL & GEN 이미지 데이터 (드라이브 관리)
 ├── EVAL_METRIC        # RM, PVR, AAR, NED 추출 및 분석 스크립트
@@ -58,3 +63,4 @@ TrustLens
 │   ├── inference.py   # 모델 추론 로직
 │   └── llm_service.py # 리포트 생성 로직
 └── requirements.txt   # 환경 설정
+```
