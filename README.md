@@ -26,7 +26,7 @@ TrustLens는 이커머스 환경에서 생성형 AI로 만든 이미지를 탐�
 1. **Stable Diffusion을 활용한 AI 이미지 생성:**
     - Prompt 및 모델 파라미터 실험을 통해 이미지 생성.
     - 원본과 생성본을 통해 모든 이미지에 대해 정량적 지표(SSIM, LPIPS) 계산.
-    - 총 원본(REAL) 3,801장과 생성(GEN) 장으로 구성된 데이터셋 구축.
+    - 총 원본(REAL) 3,797장과 생성(GEN) 12,920장으로 구성된 데이터셋 구축.
 2. **Risk Zone 레이블링:**
     - 원본(REAL)은 Zone A로 고정.
     - 나머지 생성본(GEN)에 대해 K-Means Clustering을 적용하여 3단계의 리스크 존(Zone B~D) 정의.
