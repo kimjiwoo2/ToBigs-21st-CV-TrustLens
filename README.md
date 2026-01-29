@@ -47,7 +47,7 @@ TrustLens는 이커머스 환경에서 생성형 AI로 만든 이미지를 탐�
 - **Deep Learning**: PyTorch, Swin Transformer (Hugging Face), Grad-CAM
 - **Data Analysis**: Pandas, Scikit-learn, Matplotlib, Statsmodels (ANOVA/Tukey HSD)
 - **Service**: Streamlit, Solar Pro2 API
-- **Tools**: Google Colab, Google Drive (Data Management), Notion, Git
+- **Tools**: Google Colab, Visual Studio Code, Google Drive (Data Management), Notion, Git
 
 
 
